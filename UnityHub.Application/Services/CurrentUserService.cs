@@ -1,0 +1,25 @@
+﻿using Microsoft.AspNetCore.Http;
+using System.Security.Claims;
+using UnityHub.Application.Interfaces.Services;
+
+namespace UnityHub.Infrastructure.Services
+{
+    public class CurrentUserService : ICurrentUserService
+    {
+        private readonly IHttpContextAccessor _httpContextAccessor;
+
+        public CurrentUserService(IHttpContextAccessor httpContextAccessor)
+        {
+            _httpContextAccessor = httpContextAccessor;
+        }
+
+        public long? UserId
+        {
+            get
+            {
+                var userIdClaim = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
+                return long.TryParse(userIdClaim?.Value, out var id) ? id : (long?)null;
+            }
+        }
+    }
+}
