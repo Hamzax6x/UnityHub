@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace UnityHub.Application.Services
+namespace UnityHub.Infrastructure.Repositories
 {
-    internal class UserRoleService
+    internal class UserRoleRepository
     {
     }
 }

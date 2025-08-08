@@ -43,8 +43,8 @@ namespace UnityHub.Infrastructure.Repositories
             cmd.Parameters.AddWithValue("@Name", role.Name);
             cmd.Parameters.AddWithValue("@Description", (object?)role.Description ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@UpdatedBy", (object?)role.UpdatedBy ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("@CreatedTime", role.CreatedTime);
-            cmd.Parameters.AddWithValue("@UpdatedTime", role.UpdatedTime);
+            /*cmd.Parameters.AddWithValue("@CreatedTime", role.CreatedTime);
+            cmd.Parameters.AddWithValue("@UpdatedTime", role.UpdatedTime);*/
 
             await conn.OpenAsync();
             await cmd.ExecuteNonQueryAsync();

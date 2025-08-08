@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using UnityHub.Application.DTOs;
 using UnityHub.Application.Interfaces.Services;
 using UnityHub.Application.Services;
@@ -15,6 +16,13 @@ namespace UnityHub.WebApi.Controllers
         {
             _service = service;
         }
+
+        private long GetUserIdFromToken()
+        {
+            var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
+            return userIdClaim != null ? long.Parse(userIdClaim.Value) : 0;
+        }
+
 
         [HttpGet("paged")]
         public async Task<IActionResult> GetPaged(int page = 1, int size = 10, DateTime? start = null, DateTime? end = null)
@@ -33,7 +41,10 @@ namespace UnityHub.WebApi.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] RoleCreateDto dto)
         {
-            long createdBy = 1; // Replace with JWT userId
+            var isAdmin = User.IsInRole("Admin");
+            if (!isAdmin)
+                return BadRequest(new { message = "Only admins can perform this action." });
+            dto.Createdby = GetUserIdFromToken();
             await _service.CreateAsync(dto);
             return Ok("Role created successfully");
         }
@@ -41,15 +52,18 @@ namespace UnityHub.WebApi.Controllers
         [HttpPut]
         public async Task<IActionResult> Update([FromBody] RoleUpdateDto dto)
         {
-            long updatedBy = 1; // Replace with JWT userId
+            var isAdmin = User.IsInRole("Admin");
+            if (!isAdmin)
+                return BadRequest(new { message = "Only admins can perform this action." });
+            dto.Updatedby = GetUserIdFromToken();
             await _service.UpdateAsync(dto);
-            return Ok();
+            return Ok(new { message = "Role Updated Successfully." });
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            long updatedBy = 1; // Replace with JWT userId
+            long updatedBy = 16; // Replace with JWT userId
             await _service.DeleteAsync(id);
             return Ok();
         }

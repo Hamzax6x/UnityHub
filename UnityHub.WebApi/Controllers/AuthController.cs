@@ -63,20 +63,39 @@ namespace UnityHub.WebApi.Controllers
                 return Unauthorized(ex.Message);
             }
         }
+        [Produces("application/json")]
         [HttpPost("forgot-password")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequestDto dto)
         {
-            await _authService.ForgotPasswordAsync(dto.Email);
-            return Ok("Password reset link has been sent to your email.");
-        }
 
+            try
+            {
+                await _authService.ForgotPasswordAsync(dto.Email);
+
+                // ✅ Always return a JSON object
+                return Ok(new { message = "📧 Password reset link has been sent to your email." });
+            }
+            catch (Exception ex)
+            {
+                // ✅ Return error in JSON format
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+        [Produces("application/json")]
         [HttpPost("reset-password")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequestDto dto)
         {
-            await _authService.ResetPasswordAsync(dto.Email, dto.Token, dto.NewPassword);
-            return Ok("Password has been reset successfully.");
+            try
+            {
+                await _authService.ResetPasswordAsync(dto.Email, dto.Token, dto.NewPassword);
+                return Ok(new { message = "Password has been reset successfully." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+
+
         }
-
-
     }
 }

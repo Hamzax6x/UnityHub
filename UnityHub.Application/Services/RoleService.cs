@@ -57,7 +57,7 @@ namespace UnityHub.Application.Services
             {
                 Name = dto.Name,
                 Description = dto.Description,
-                CreatedBy = createdBy ?? 0
+                CreatedBy = dto.Createdby
             };
 
             await _repo.AddAsync(role);
@@ -72,7 +72,7 @@ namespace UnityHub.Application.Services
                 Id = dto.Id,
                 Name = dto.Name,
                 Description = dto.Description,
-                UpdatedBy = updatedBy ?? 0
+                UpdatedBy = dto.Updatedby
             };
 
             await _repo.UpdateAsync(role);
@@ -82,7 +82,7 @@ namespace UnityHub.Application.Services
         public async Task DeleteAsync(int id)
         {
             var updatedBy = GetUserId();
-            await _repo.DeleteAsync(id, updatedBy ?? 0);
+            await _repo.DeleteAsync(id, updatedBy ?? 16);
             await LogAsync(updatedBy, $"Deleted role ID: {id}", "Warning");
         }
 

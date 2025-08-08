@@ -1,5 +1,6 @@
 ﻿using System.Data;
 using System.Data.SqlClient;
+using UnityHub.Domain.Entities;
 using UnityHub.Infrastructure.DbConnection;
 
 public class AuditLogRepository : IAuditLogRepository
@@ -28,5 +29,31 @@ public class AuditLogRepository : IAuditLogRepository
 
         await conn.OpenAsync();
         await cmd.ExecuteNonQueryAsync();
+    }
+    public async Task<List<AuditLog>> GetAllAsync()
+    {
+        var logs = new List<AuditLog>();
+
+        using var conn = _dbConnectionFactory.CreateConnection();
+        using var cmd = new SqlCommand("SELECT * FROM AuditLogs ORDER BY ExecutionTime DESC", conn);
+
+        await conn.OpenAsync();
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            logs.Add(new AuditLog
+            {
+                Id = reader.GetInt64(reader.GetOrdinal("Id")),
+                UserId = reader.IsDBNull(reader.GetOrdinal("UserId")) ? null : reader.GetInt64(reader.GetOrdinal("UserId")),
+                Action = reader.GetString(reader.GetOrdinal("Action")),
+                LogType = reader.GetString(reader.GetOrdinal("LogType")),
+                ExecutionTime = reader.GetDateTime(reader.GetOrdinal("ExecutionTime")),
+                ClientIpAddress = reader.IsDBNull(reader.GetOrdinal("ClientIpAddress")) ? null : reader.GetString(reader.GetOrdinal("ClientIpAddress")),
+                BrowserInfo = reader.IsDBNull(reader.GetOrdinal("BrowserInfo")) ? null : reader.GetString(reader.GetOrdinal("BrowserInfo"))
+            });
+        }
+
+        return logs;
     }
 }

@@ -10,8 +10,5 @@ namespace UnityHub.Application.Interfaces.Services
         Task<RefreshTokenResponseDto> RefreshTokenAsync(string refreshToken);
         Task ForgotPasswordAsync(string email);
         Task ResetPasswordAsync(string email, string token, string newPassword);
-
-
-
-    }
+    }
 }

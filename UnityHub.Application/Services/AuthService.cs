@@ -47,6 +47,7 @@ namespace UnityHub.Application.Services
 
         public async Task<LoginResponseDto> LoginAsync(LoginRequestDto dto)
         {
+            
             var user = await _userRepository.GetByEmailOrUsernameAsync(dto.Email);
 
             if (user == null)
@@ -55,43 +56,29 @@ namespace UnityHub.Application.Services
                 throw new UnauthorizedAccessException("Invalid credentials");
             }
 
-            // Permanently blocked
             if (user.AccessFailedCount >= 5)
                 throw new UnauthorizedAccessException("Account permanently blocked. Please contact admin.");
 
-            // Auto-reactivate if lockout has expired
-            if (user.LockoutEnabled &&
-                user.LockoutEnd.HasValue &&
-                user.LockoutEnd.Value <= DateTime.UtcNow &&
-                !user.IsActive &&
-                user.AccessFailedCount < 5)
+            if (user.LockoutEnabled && user.LockoutEnd.HasValue && user.LockoutEnd.Value <= DateTime.UtcNow && !user.IsActive && user.AccessFailedCount < 5)
             {
                 await _userRepository.ReactivateUserAfterLockoutAsync(user.Id);
                 user.IsActive = true;
                 await LogAsync(user.Id, "Account auto-reactivated after lockout", "Info");
             }
 
-            // Still locked out
-            if (user.LockoutEnabled &&
-                user.LockoutEnd.HasValue &&
-                user.LockoutEnd.Value > DateTime.UtcNow)
+            if (user.LockoutEnabled && user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow)
             {
                 TimeZoneInfo pakistanTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Pakistan Standard Time");
                 DateTime lockoutEndInPakistan = TimeZoneInfo.ConvertTimeFromUtc(user.LockoutEnd.Value, pakistanTimeZone);
-
-                throw new UnauthorizedAccessException(
-                    $"User is locked out. Try again at {lockoutEndInPakistan:yyyy-MM-dd hh:mm tt} (Pakistan Time)");
+                throw new UnauthorizedAccessException($"User is locked out. Try again at {lockoutEndInPakistan:yyyy-MM-dd hh:mm tt} (Pakistan Time)");
             }
 
-            // Account deactivated
             if (!user.IsActive)
                 throw new UnauthorizedAccessException("Account is deactivated.");
 
-            // Email not confirmed
             if (!user.EmailConfirmed)
                 throw new UnauthorizedAccessException("Please confirm your email to login.");
 
-            // Verify password
             var hasher = new PasswordHasher<string>();
             var result = hasher.VerifyHashedPassword(null, user.PasswordHash, dto.Password);
 
@@ -113,15 +100,25 @@ namespace UnityHub.Application.Services
                 throw new UnauthorizedAccessException("Invalid credentials");
             }
 
-            // ✅ Correct password entered: reset AccessFailedCount
             if (user.AccessFailedCount > 0)
             {
                 await _userRepository.ResetAccessFailedCountAsync(user.Id);
             }
 
-            // Generate tokens
-            string accessToken = CreateJwt(user);
+            // ✅ Generate tokens
+            string accessToken = await CreateJwtAsync(user);
             string refreshToken = GenerateRefreshToken();
+            var now = DateTime.UtcNow;
+            // ✅ Save refresh token
+            await _refreshTokenRepository.AddAsync(new RefreshToken
+            {
+                UserId = user.Id,
+                Token = refreshToken,
+                CreatedAt = now,
+                ExpiresAt = now.AddMinutes(10) // ⏳ Adjust to your policy
+            });
+
+            await LogAsync(user.Id, $"Login Successful: {dto.Email}", "Success");
 
             return new LoginResponseDto
             {
@@ -132,7 +129,6 @@ namespace UnityHub.Application.Services
                 UserName = user.UserName
             };
         }
-
 
         public async Task<RefreshTokenResponseDto> RefreshTokenAsync(string refreshToken)
         {
@@ -146,15 +142,15 @@ namespace UnityHub.Application.Services
 
             await _refreshTokenRepository.RevokeAsync(refreshToken);
 
-            string newJwt = CreateJwt(user);
+            string newJwt = await CreateJwtAsync(user);
             string newRefreshToken = GenerateRefreshToken();
-
+            var now = DateTime.UtcNow;
             await _refreshTokenRepository.AddAsync(new RefreshToken
             {
                 UserId = user.Id,
                 Token = newRefreshToken,
-                CreatedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(10)
+                CreatedAt = now,
+                ExpiresAt = now.AddHours(2)
             });
 
             await LogAsync(user.Id, "Token refreshed", "Info");
@@ -193,7 +189,15 @@ namespace UnityHub.Application.Services
 
             await _userRepository.SavePasswordResetTokenAsync(user.Id, token, expiry);
 
-            var resetLink = $"https://localhost:7296/reset-password?email={email}&token={token}";
+            // Fetch URL from configuration for deployment flexibility
+            var frontendUrl = _configuration["ApplicationUrls:FrontendUrl"];
+            if (string.IsNullOrEmpty(frontendUrl))
+            {
+                // Fallback or throw if URL not configured
+                frontendUrl = "http://localhost:4200"; // Fallback for development
+            }
+            var resetLink = $"{frontendUrl}/auth/reset-password?email={email}&token={token}";
+
             await _emailSender.SendEmailAsync(email, "Reset Your Password", $"Reset your password using this link: <a href='{resetLink}'>{resetLink}</a>");
 
             await LogAsync(user.Id, "Password reset requested", "Info");
@@ -208,7 +212,14 @@ namespace UnityHub.Application.Services
             string token = Guid.NewGuid().ToString();
             await _userRepository.UpdateEmailConfirmationTokenAsync(user.Id, token);
 
-            var confirmationLink = $"https://localhost:7296/api/Auth/confirm?email={email}&token={token}";
+            // Fetch URL from configuration for deployment flexibility
+            var backendUrl = _configuration["ApplicationUrls:BackendUrl"];
+            if (string.IsNullOrEmpty(backendUrl))
+            {
+                // Fallback or throw if URL not configured
+                backendUrl = "https://localhost:7296"; // Fallback for development
+            }
+            var confirmationLink = $"{backendUrl}/api/Auth/confirm?email={email}&token={token}";
             string subject = "Confirm your email";
             string body = $"<p>Please click the link below to verify your email:</p><a href=\"{confirmationLink}\">{confirmationLink}</a>";
 
@@ -216,35 +227,48 @@ namespace UnityHub.Application.Services
             await LogAsync(user.Id, "Verification email sent", "Info");
         }
 
+        // --- ADD THIS NEW METHOD TO RESOLVE CS0535 ERROR ---
         public async Task ResetPasswordAsync(string email, string token, string newPassword)
         {
             var user = await _userRepository.GetByEmailAsync(email);
-            if (user == null || user.PasswordResetToken != token || user.PasswordResetTokenExpiry < DateTime.UtcNow)
+            if (user == null || string.IsNullOrWhiteSpace(user.PasswordResetToken) || user.PasswordResetToken != token || !user.PasswordResetTokenExpiry.HasValue || user.PasswordResetTokenExpiry.Value < DateTime.UtcNow)
             {
-                await LogAsync(user?.Id ?? 0, "Password reset failed: invalid/expired token", "Error");
-                throw new Exception("Invalid or expired token");
+                await LogAsync(user?.Id, $"Password reset failed for {email}: Invalid or expired token", "Warning");
+                throw new UnauthorizedAccessException("Invalid or expired password reset token.");
             }
 
             var hasher = new PasswordHasher<string>();
-            string newHash = hasher.HashPassword(null, newPassword);
+            var newPasswordHash = hasher.HashPassword(null, newPassword);
 
-            await _userRepository.UpdatePasswordAsync(user.Id, newHash);
+            await _userRepository.ResetPasswordAsync(user.Id, newPasswordHash);
+            await _userRepository.ClearPasswordResetTokenAsync(user.Id); // Clear the token after use
             await LogAsync(user.Id, "Password reset successfully", "Info");
         }
 
-        private string CreateJwt(User user)
+
+        private async Task<string> CreateJwtAsync(User user)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!);
+
+            var roles = await _userRepository.GetUserRolesAsync(user.Id);
+
+            var claims = new List<Claim>
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email ?? ""),
+                new Claim("username", user.UserName)
+            };
+
+            foreach (var role in roles)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
+            var now = DateTime.UtcNow;
             var tokenDescriptor = new SecurityTokenDescriptor
             {
-                Subject = new ClaimsIdentity(new[]
-                {
-                    new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-                    new Claim(JwtRegisteredClaimNames.Email, user.Email ?? ""),
-                    new Claim("username", user.UserName),
-                }),
-                Expires = DateTime.UtcNow.AddHours(2),
+                Subject = new ClaimsIdentity(claims),
+                Expires = now.AddHours(2),
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature),
                 Issuer = _configuration["Jwt:Issuer"],
                 Audience = _configuration["Jwt:Audience"]

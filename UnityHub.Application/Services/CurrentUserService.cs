@@ -13,13 +13,21 @@ namespace UnityHub.Infrastructure.Services
             _httpContextAccessor = httpContextAccessor;
         }
 
-        public long? UserId
+        public long UserId
         {
             get
             {
                 var userIdClaim = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
-                return long.TryParse(userIdClaim?.Value, out var id) ? id : (long?)null;
+                if (userIdClaim == null || !long.TryParse(userIdClaim.Value, out var id))
+                    throw new UnauthorizedAccessException("User is not authenticated.");
+                return id;
             }
         }
+
+        public string ClientIpAddress =>
+            _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString() ?? "Unknown IP";
+
+        public string BrowserInfo =>
+            _httpContextAccessor.HttpContext?.Request?.Headers["User-Agent"].ToString() ?? "Unknown Browser";
     }
 }

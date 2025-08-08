@@ -21,7 +21,8 @@ namespace UnityHub.Application.DTOs
         public string PhoneNumber { get; set; }
 
         public string ProfilePictureUrl { get; set; }
-
+        public List<int> RoleIds { get; set; } = new();
         public long CreatedBy { get; set; }
+
     }
 }

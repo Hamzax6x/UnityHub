@@ -2,6 +2,8 @@
 {
     public interface ICurrentUserService
     {
-        long? UserId { get; }
+        long UserId { get; }
+        string ClientIpAddress { get; }      // ✅ NEW
+        string BrowserInfo { get; }
     }
 }

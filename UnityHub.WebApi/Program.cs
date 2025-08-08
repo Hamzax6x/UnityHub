@@ -7,9 +7,13 @@ using UnityHub.Application.Interfaces.Services;
 using UnityHub.Application.Services;
 using UnityHub.Infrastructure.DbConnection;
 using UnityHub.Infrastructure.Repositories;
-using UnityHub.Infrastructure.Services;
+// Make sure to include the correct namespaces for your JazzCash integration
+using UnityHub.Infrastructure.Interfaces; // For IJazzCashRaastService
+using UnityHub.Infrastructure.Services;   // For JazzCashRaastService
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ✅ CORS Configuration (specific origin with credentials support)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowLocalAngular", builder =>
@@ -75,8 +79,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-// ✅ CORS Configuration (specific origin with credentials support)
-
 
 // ✅ ADO.NET and Clean Architecture Dependency Injections
 builder.Services.AddSingleton<DbConnectionFactory>();
@@ -92,6 +94,12 @@ builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
+// ✨ NEW: JazzCash API Integration Service Registration ✨
+// This registers IJazzCashRaastService and its implementation JazzCashRaastService
+// It also configures an HttpClient instance managed by IHttpClientFactory for it.
+builder.Services.AddScoped<IJazzCashRaastService, JazzCashRaastService>();
+
+
 var app = builder.Build();
 
 // 🔧 Middleware Pipeline Configuration
@@ -100,14 +108,16 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 
- // 🔥 CORS must be before Auth
+// 🔥 CORS must be before Auth. The order here is crucial!
+app.UseCors("AllowLocalAngular"); // Place UseCors before UseAuthentication/UseAuthorization
 
 app.UseAuthentication();
-app.UseCors("AllowLocalAngular");
-app.UseAuthorization();
+app.UseAuthorization(); // Place UseAuthorization after UseAuthentication
 
 app.MapControllers();
 

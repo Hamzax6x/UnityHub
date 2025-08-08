@@ -47,14 +47,17 @@ namespace UnityHub.WebApi.Controllers
         }
 
         // POST: api/users
-        [AllowAnonymous]
+        [Authorize]
         [HttpPost("Create")]
         public async Task<IActionResult> Create([FromBody] UserCreateDto dto)
         {
+            var isAdmin = User.IsInRole("Admin");
+            if (!isAdmin)
+                return BadRequest(new{message= "Only admins can perform this action."});
             dto.CreatedBy = GetUserIdFromToken();
 
             await _userService.CreateAsync(dto);
-            return Ok(new { message = "User created successfully Kindly check your Email for Confirmation" });
+            return Ok(new { message = "User created successfully with Roles" });
         }
 
         // PUT: api/users/{id}

@@ -1,19 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace UnityHub.Domain.Entities
+﻿namespace UnityHub.Domain.Entities
 {
     public class UserRole
     {
         public long UserId { get; set; }
         public long RoleId { get; set; }
-        public DateTime CreatedTime { get; set; }
+        public bool IsDeleted { get; set; } = false;
 
+        // Navigation properties (if you were using an ORM like EF Core)
         public User User { get; set; }
         public Role Role { get; set; }
     }
-
 }

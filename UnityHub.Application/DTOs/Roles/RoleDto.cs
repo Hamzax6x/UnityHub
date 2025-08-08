@@ -14,6 +14,7 @@
     {
         public string Name { get; set; } = default!;
         public string? Description { get; set; }
+        public long Createdby { get; set; }
     }
 
     public class RoleUpdateDto
@@ -21,6 +22,7 @@
         public int Id { get; set; }
         public string Name { get; set; } = default!;
         public string? Description { get; set; }
+        public long? Updatedby { get; set; }
     }
     public class UserRoleDto
     {

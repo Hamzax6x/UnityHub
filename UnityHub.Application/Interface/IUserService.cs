@@ -9,5 +9,6 @@ namespace UnityHub.Application.Interfaces.Services
         Task CreateAsync(UserCreateDto dto);
         Task UpdateAsync(UserUpdateDto dto);
         Task DeleteAsync(long id, long updatedBy);
+        Task<long> CreateUserWithRolesAsync(UserCreateDto dto);
     }
 }

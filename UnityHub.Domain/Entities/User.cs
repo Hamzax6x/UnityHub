@@ -21,7 +21,7 @@
         public bool IsDeleted { get; set; } = false;
         public string? EmailConfirmationToken { get; set; }
         public string PasswordResetToken { get; set; }
-        public DateTime PasswordResetTokenExpiry { get; set; }
+        public DateTime? PasswordResetTokenExpiry { get; set; }
         public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
     }
 }
